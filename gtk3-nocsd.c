@@ -408,42 +408,6 @@ static void static_g_log(const gchar *log_domain, GLogLevelFlags log_level, cons
     va_end (args);
 }
 
-int check_gtk2_callback(struct dl_phdr_info *info, size_t size, void *pointer)
-{
-    ElfW(Half) n;
-
-    if (G_UNLIKELY(strstr(info->dlpi_name, GDK_LIBRARY_SONAME_V2))) {
-        for (n = 0; n < info->dlpi_phnum; n++) {
-            uintptr_t start = (uintptr_t) (info->dlpi_addr + info->dlpi_phdr[n].p_vaddr);
-            uintptr_t end   = start + (uintptr_t) info->dlpi_phdr[n].p_memsz;
-            if ((uintptr_t) pointer >= start && (uintptr_t) pointer < end) {
-                gtk2_active = 1;
-                /* The gtk version check could have already been cached
-                 * before we were able to determine that gtk2 is in
-                 * use, so force this to FALSE. (Regardless of  the
-                 * _checked value.) */
-                is_compatible_gtk_version_cached = FALSE;
-                return 0;
-            }
-        }
-    }
-    return 0;
-}
-
-static void detect_gtk2(void *pointer)
-{
-    if (gtk2_active)
-        return;
-    /* There is a corner case where a program with plugins loads
-     * multiple plugins, some of which are linked against gtk2, while
-     * others are linked against gtk3. If the gtk2 plugins are used,
-     * this causes problems if we detect gtk3 just on the fact of
-     * whether gtk3 is loaded. Hence we iterate over all loaded
-     * libraries and if the pointer passed to us is within the memory
-     * region of gtk2, we set a global flag. */
-    dl_iterate_phdr(check_gtk2_callback, pointer);
-}
-
 static gboolean is_gtk_version_larger_or_equal2(guint major, guint minor, guint micro, int* gtk_loaded) {
     static gtk_check_version_t orig_func = NULL;
     if(!orig_func)
@@ -507,10 +471,6 @@ static void detect_gtk2(void *pointer)
      * libraries and if the pointer passed to us is within the memory
      * region of gtk2, we set a global flag. */
     dl_iterate_phdr(check_gtk2_callback, pointer);
-}
-
-static gboolean is_gtk_version_larger_or_equal2(guint major, guint minor, guint micro, int* gtk_loaded) {
-    return is_gtk_version_larger_or_equal2(major, minor, micro, NULL);
 }
 
 static gboolean are_csd_disabled() {
